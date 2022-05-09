@@ -24,6 +24,8 @@ module frequency_counter #(
     localparam STATE_TENS   = 1;
     localparam STATE_UNITS  = 2;
 
+    reg [BITS-1:0] update_period;
+
     reg [2:0] state = STATE_COUNT;
 
     reg [BITS-1:0] cycle_count;
@@ -48,12 +50,13 @@ module frequency_counter #(
             unit_count <= 0;
             state <= STATE_COUNT;
             load <= 0;
+            update_period <= UPDATE_PERIOD;
         end else begin
             case(state)
                 STATE_COUNT: begin
                     load <= 0;
                     // count edges and clock cycles
-                    if (cycle_count < UPDATE_PERIOD) begin
+                    if (cycle_count < update_period) begin
                         cycle_count <= cycle_count + 1;
                         if (leading_edge_detect)
                             edge_count <= edge_count + 1;
@@ -98,6 +101,9 @@ module frequency_counter #(
 
             endcase
         end
+
+        if (period_load)
+            update_period <= period;
     end
 
 endmodule
