@@ -17,6 +17,8 @@ module frequency_counter #(
     output wire             digit
     );
 
+    localparam EDGE_COUNTER_WIDTH = $clog2(99);
+
     // states
     localparam STATE_COUNT  = 0;
     localparam STATE_TENS   = 1;
@@ -24,31 +26,71 @@ module frequency_counter #(
 
     reg [2:0] state = STATE_COUNT;
 
+    reg [BITS-1:0] cycle_count;
+    reg [EDGE_COUNTER_WIDTH-1:0] edge_count;
+    wire leading_edge_detect;
+
+    reg [3:0] ten_count;
+    reg [3:0] unit_count;
+
+    reg load;
+
+    edge_detect edge_detector (.clk, .signal, .leading_edge_detect);
+
+    seven_segment seven_segment_driver (.clk, .reset,
+        .load, .ten_count, .unit_count, .segments, .digit);
+
     always @(posedge clk) begin
         if(reset) begin
-            
-            // reset things here
-
+            cycle_count <= 0;
+            edge_count <= 0;
+            ten_count <= 0;
+            unit_count <= 0;
+            state <= STATE_COUNT;
+            load <= 0;
         end else begin
             case(state)
                 STATE_COUNT: begin
+                    load <= 0;
                     // count edges and clock cycles
+                    if (cycle_count < UPDATE_PERIOD) begin
+                        cycle_count <= cycle_count + 1;
+                        if (leading_edge_detect)
+                            edge_count <= edge_count + 1;
+                    end
+                    // if clock cycles >= UPDATE_PERIOD then go to next state
+                    else begin
+                        cycle_count <= 0;
+                        state <= STATE_TENS;
+                        ten_count <= 0;
+                        unit_count <= 0;
+                    end
 
-                    // if clock cycles > UPDATE_PERIOD then go to next state
                 end
 
                 STATE_TENS: begin
                     // count number of tens by subtracting 10 while edge counter >= 10
-
+                    if (edge_count >= 10) begin
+                        edge_count <= edge_count - 10;
+                        ten_count <= ten_count + 1;
+                    end
                     // then go to next state
+                    else begin
+                        state <= STATE_UNITS;
+                    end
+
                 end
 
                 STATE_UNITS: begin
                     // what is left in edge counter is units
+                    edge_count <= 0;
+                    unit_count <= edge_count;
 
                     // update the display
+                    load <= 1;
 
                     // go back to counting
+                    state <= STATE_COUNT;
                 end
 
                 default:
